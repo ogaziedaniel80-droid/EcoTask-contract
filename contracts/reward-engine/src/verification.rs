@@ -11,6 +11,9 @@ impl RewardEngine {
         if storage::has_admin(&e) {
             panic!("already initialized");
         }
+        if admin == oracle {
+            panic!("oracle must be different from admin");
+        }
         storage::write_admin(&e, &admin);
         storage::write_token(&e, &token);
         storage::write_registry(&e, &registry);
@@ -253,6 +256,20 @@ mod test {
         let verification = client.get_verification(&task_id, &user);
         assert_eq!(verification.status, VerificationStatus::Rejected);
         assert!(verification.resolved_at.is_some());
+    }
+
+    #[test]
+    #[should_panic(expected = "oracle must be different from admin")]
+    fn test_initialize_oracle_same_as_admin() {
+        let e = Env::default();
+        let admin = Address::generate(&e);
+        let token = Address::generate(&e);
+        let registry = Address::generate(&e);
+
+        let engine_id = e.register_contract(None, RewardEngine);
+        let engine_client = RewardEngineClient::new(&e, &engine_id);
+
+        engine_client.initialize(&admin, &token, &registry, &admin);
     }
 
     #[test]

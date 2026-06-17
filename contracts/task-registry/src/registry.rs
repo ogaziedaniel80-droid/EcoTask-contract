@@ -119,6 +119,10 @@ impl RegistryContract {
             None => panic!("task not found"),
         };
 
+        if task.status != TaskStatus::Active {
+            panic!("task is not active");
+        }
+
         task.status = TaskStatus::Expired;
         storage::write_task(&e, &task);
     }
@@ -295,6 +299,18 @@ mod test {
 
         let task = client.get_task(&task_id);
         assert_eq!(task.creator, sponsor);
+    }
+
+    #[test]
+    #[should_panic(expected = "task is not active")]
+    fn test_expire_already_expired_task() {
+        let (e, admin, client) = setup();
+        e.mock_all_auths();
+
+        let task_id = create_test_task(&client, &admin, &String::from_str(&e, "tree-planting"), 1, 1000);
+
+        client.expire_task(&admin, &task_id);
+        client.expire_task(&admin, &task_id);
     }
 
     #[test]

@@ -19,11 +19,15 @@ impl TokenContract {
         let admin = storage::read_admin(&e);
         admin.require_auth();
 
+        if amount <= 0 {
+            panic!("amount must be positive");
+        }
+
         let balance = storage::read_balance(&e, &to);
-        storage::write_balance(&e, &to, balance + amount);
+        storage::write_balance(&e, &to, balance.checked_add(amount).expect("balance overflow"));
 
         let supply = storage::read_supply(&e);
-        storage::write_supply(&e, supply + amount);
+        storage::write_supply(&e, supply.checked_add(amount).expect("supply overflow"));
 
         e.events().publish(
             (Symbol::new(&e, "mint"), admin, to.clone()),
@@ -34,15 +38,19 @@ impl TokenContract {
     pub fn transfer(e: Env, from: Address, to: Address, amount: i128) {
         from.require_auth();
 
+        if amount <= 0 {
+            panic!("amount must be positive");
+        }
+
         let from_balance = storage::read_balance(&e, &from);
         if from_balance < amount {
             panic!("insufficient balance");
         }
 
-        storage::write_balance(&e, &from, from_balance - amount);
+        storage::write_balance(&e, &from, from_balance.checked_sub(amount).expect("balance underflow"));
 
         let to_balance = storage::read_balance(&e, &to);
-        storage::write_balance(&e, &to, to_balance + amount);
+        storage::write_balance(&e, &to, to_balance.checked_add(amount).expect("balance overflow"));
 
         e.events().publish(
             (Symbol::new(&e, "transfer"), from.clone(), to.clone()),
@@ -145,6 +153,26 @@ mod test {
 
         assert_eq!(client.balance(&from), 200);
         assert_eq!(client.balance(&to), 300);
+    }
+
+    #[test]
+    #[should_panic(expected = "amount must be positive")]
+    fn test_mint_zero_amount() {
+        let e = Env::default();
+        let admin = Address::generate(&e);
+        let user = Address::generate(&e);
+        let contract_id = e.register_contract(None, TokenContract);
+        let client = TokenContractClient::new(&e, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&e, "ECO"),
+            &String::from_str(&e, "ECO"),
+            &7,
+        );
+
+        e.mock_all_auths();
+        client.mint(&user, &0);
     }
 
     #[test]
