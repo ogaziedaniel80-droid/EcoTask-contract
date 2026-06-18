@@ -1,5 +1,5 @@
 use crate::storage;
-use soroban_sdk::{contract, contractimpl, contractevent, Address, Env, String};
+use soroban_sdk::{contract, contractevent, contractimpl, Address, Env, String};
 
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -1,5 +1,7 @@
 use crate::storage;
-use soroban_sdk::{contract, contractimpl, contractevent, vec, Address, Env, IntoVal, String, Symbol, Val};
+use soroban_sdk::{
+    contract, contractevent, contractimpl, vec, Address, Env, IntoVal, String, Symbol, Val,
+};
 pub use storage::{Verification, VerificationStatus};
 
 #[contractevent]
@@ -198,11 +200,7 @@ impl RewardEngine {
         verification.status = VerificationStatus::Disputed;
         storage::write_verification(&e, task_id, &user, &verification);
 
-        DisputeRaisedEvent {
-            user,
-            task_id,
-        }
-        .publish(&e);
+        DisputeRaisedEvent { user, task_id }.publish(&e);
     }
 
     pub fn get_verification(e: Env, task_id: u64, user: Address) -> Verification {

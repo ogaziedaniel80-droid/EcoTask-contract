@@ -1,5 +1,5 @@
 use crate::{access, storage};
-use soroban_sdk::{contract, contractimpl, contractevent, Address, BytesN, Env, String};
+use soroban_sdk::{contract, contractevent, contractimpl, Address, BytesN, Env, String};
 pub use storage::{Task, TaskStatus};
 
 #[contractevent]
@@ -88,11 +88,7 @@ impl RegistryContract {
 
         storage::write_task(&e, &task);
 
-        TaskCreatedEvent {
-            creator,
-            task_id,
-        }
-        .publish(&e);
+        TaskCreatedEvent { creator, task_id }.publish(&e);
 
         task_id
     }
@@ -134,11 +130,7 @@ impl RegistryContract {
         storage::write_task(&e, &task);
         storage::mark_completed(&e, task_id, &user);
 
-        TaskCompletedEvent {
-            user,
-            task_id,
-        }
-        .publish(&e);
+        TaskCompletedEvent { user, task_id }.publish(&e);
     }
 
     pub fn expire_task(e: Env, caller: Address, task_id: u64) {
