@@ -4,11 +4,41 @@ pub use storage::{Verification, VerificationStatus};
 
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RewardEvent {
-    ProofSubmitted(Address, Address, u64),
-    RewardPaid(Address, Address, u64, i128),
-    ProofRejected(Address, Address, u64),
-    DisputeRaised(Address, u64),
+pub struct ProofSubmittedEvent {
+    #[topic]
+    pub oracle: Address,
+    #[topic]
+    pub user: Address,
+    pub task_id: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RewardPaidEvent {
+    #[topic]
+    pub oracle: Address,
+    #[topic]
+    pub user: Address,
+    pub task_id: u64,
+    pub amount: i128,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProofRejectedEvent {
+    #[topic]
+    pub oracle: Address,
+    #[topic]
+    pub user: Address,
+    pub task_id: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DisputeRaisedEvent {
+    #[topic]
+    pub user: Address,
+    pub task_id: u64,
 }
 
 #[contract]
@@ -62,10 +92,12 @@ impl RewardEngine {
 
         storage::write_verification(&e, task_id, &user, &verification);
 
-        e.events().publish(
-            (),
-            RewardEvent::ProofSubmitted(oracle, user, task_id),
-        );
+        ProofSubmittedEvent {
+            oracle,
+            user,
+            task_id,
+        }
+        .publish(&e);
     }
 
     pub fn approve_proof(
@@ -114,10 +146,13 @@ impl RewardEngine {
             vec![&e, user.clone().into_val(&e), reward_amount.into_val(&e)],
         );
 
-        e.events().publish(
-            (),
-            RewardEvent::RewardPaid(oracle, user, task_id, reward_amount),
-        );
+        RewardPaidEvent {
+            oracle,
+            user,
+            task_id,
+            amount: reward_amount,
+        }
+        .publish(&e);
     }
 
     pub fn reject_proof(e: Env, oracle: Address, user: Address, task_id: u64) {
@@ -140,10 +175,12 @@ impl RewardEngine {
         verification.resolved_at = Some(e.ledger().timestamp());
         storage::write_verification(&e, task_id, &user, &verification);
 
-        e.events().publish(
-            (),
-            RewardEvent::ProofRejected(oracle, user, task_id),
-        );
+        ProofRejectedEvent {
+            oracle,
+            user,
+            task_id,
+        }
+        .publish(&e);
     }
 
     pub fn dispute_proof(e: Env, caller: Address, user: Address, task_id: u64) {
@@ -161,10 +198,11 @@ impl RewardEngine {
         verification.status = VerificationStatus::Disputed;
         storage::write_verification(&e, task_id, &user, &verification);
 
-        e.events().publish(
-            (),
-            RewardEvent::DisputeRaised(user, task_id),
-        );
+        DisputeRaisedEvent {
+            user,
+            task_id,
+        }
+        .publish(&e);
     }
 
     pub fn get_verification(e: Env, task_id: u64, user: Address) -> Verification {

@@ -1,12 +1,32 @@
 use crate::storage;
-use soroban_sdk::{contract, contractimpl, contractevent, Address, Env, String, Symbol};
+use soroban_sdk::{contract, contractimpl, contractevent, Address, Env, String};
 
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TokenEvent {
-    Mint(Address, Address, i128),
-    Transfer(Address, Address, i128),
-    Burn(Address, i128),
+pub struct MintEvent {
+    #[topic]
+    pub admin: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferEvent {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BurnEvent {
+    #[topic]
+    pub from: Address,
+    pub amount: i128,
 }
 
 #[contract]
@@ -41,8 +61,12 @@ impl TokenContract {
         let supply = storage::read_supply(&e);
         storage::write_supply(&e, supply.checked_add(amount).expect("supply overflow"));
 
-        e.events()
-            .publish((), TokenEvent::Mint(admin, to.clone(), amount));
+        MintEvent {
+            admin,
+            to: to.clone(),
+            amount,
+        }
+        .publish(&e);
     }
 
     pub fn transfer(e: Env, from: Address, to: Address, amount: i128) {
@@ -70,10 +94,12 @@ impl TokenContract {
             to_balance.checked_add(amount).expect("balance overflow"),
         );
 
-        e.events().publish(
-            (),
-            TokenEvent::Transfer(from.clone(), to.clone(), amount),
-        );
+        TransferEvent {
+            from: from.clone(),
+            to: to.clone(),
+            amount,
+        }
+        .publish(&e);
     }
 
     pub fn balance(e: Env, id: Address) -> i128 {

@@ -1,14 +1,34 @@
 use crate::{access, storage};
-use soroban_sdk::{contract, contractimpl, contractevent, Address, BytesN, Env, String, Symbol};
+use soroban_sdk::{contract, contractimpl, contractevent, Address, BytesN, Env, String};
 pub use storage::{Task, TaskStatus};
 
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RegistryEvent {
-    TaskCreated(Address, u64),
-    TaskCompleted(Address, u64),
-    TaskExpired(u64),
-    SponsorAdded(Address),
+pub struct TaskCreatedEvent {
+    #[topic]
+    pub creator: Address,
+    pub task_id: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TaskCompletedEvent {
+    #[topic]
+    pub user: Address,
+    pub task_id: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TaskExpiredEvent {
+    pub task_id: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SponsorAddedEvent {
+    #[topic]
+    pub sponsor: Address,
 }
 
 #[contract]
@@ -68,8 +88,11 @@ impl RegistryContract {
 
         storage::write_task(&e, &task);
 
-        e.events()
-            .publish((), RegistryEvent::TaskCreated(creator, task_id));
+        TaskCreatedEvent {
+            creator,
+            task_id,
+        }
+        .publish(&e);
 
         task_id
     }
@@ -111,8 +134,11 @@ impl RegistryContract {
         storage::write_task(&e, &task);
         storage::mark_completed(&e, task_id, &user);
 
-        e.events()
-            .publish((), RegistryEvent::TaskCompleted(user, task_id));
+        TaskCompletedEvent {
+            user,
+            task_id,
+        }
+        .publish(&e);
     }
 
     pub fn expire_task(e: Env, caller: Address, task_id: u64) {
