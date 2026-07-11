@@ -384,7 +384,8 @@ mod test {
     }
 
     #[test]
-    fn test_burn() {        let e = Env::default();
+    fn test_burn() {
+        let e = Env::default();
         let admin = Address::generate(&e);
         let user = Address::generate(&e);
         let contract_id = e.register(TokenContract, ());
