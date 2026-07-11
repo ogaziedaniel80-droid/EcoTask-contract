@@ -31,6 +31,7 @@ pub enum DataKey {
     Admin,
     Sponsors,
     Completion(u64, Address),
+    CreatorTasks(Address),
 }
 
 pub fn write_task(e: &Env, task: &Task) {
@@ -86,4 +87,16 @@ pub fn mark_completed(e: &Env, task_id: u64, user: &Address) {
 pub fn is_completed(e: &Env, task_id: u64, user: &Address) -> bool {
     let key = DataKey::Completion(task_id, user.clone());
     e.storage().persistent().get(&key).unwrap_or(false)
+}
+
+pub fn push_creator_task(e: &Env, creator: &Address, task_id: u64) {
+    let key = DataKey::CreatorTasks(creator.clone());
+    let mut ids: Vec<u64> = e.storage().instance().get(&key).unwrap_or(Vec::new(e));
+    ids.push_back(task_id);
+    e.storage().instance().set(&key, &ids);
+}
+
+pub fn read_creator_tasks(e: &Env, creator: &Address) -> Vec<u64> {
+    let key = DataKey::CreatorTasks(creator.clone());
+    e.storage().instance().get(&key).unwrap_or(Vec::new(e))
 }

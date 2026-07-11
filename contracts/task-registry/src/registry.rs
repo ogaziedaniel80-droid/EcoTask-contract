@@ -88,6 +88,8 @@ impl RegistryContract {
 
         storage::write_task(&e, &task);
 
+        storage::push_creator_task(&e, &creator, task_id);
+
         TaskCreatedEvent { creator, task_id }.publish(&e);
 
         task_id
@@ -156,6 +158,10 @@ impl RegistryContract {
 
     pub fn is_task_completed(e: Env, task_id: u64, user: Address) -> bool {
         storage::is_completed(&e, task_id, &user)
+    }
+
+    pub fn get_tasks_by_creator(e: Env, creator: Address) -> soroban_sdk::Vec<u64> {
+        storage::read_creator_tasks(&e, &creator)
     }
 }
 
@@ -385,5 +391,27 @@ mod test {
 
         e.ledger().set_timestamp(3000);
         client.complete_task(&admin, &task_id, &user);
+    }
+
+    #[test]
+    fn test_get_tasks_by_creator() {
+        let (e, admin, client) = setup();
+        e.mock_all_auths();
+
+        let task_type = String::from_str(&e, "tree-planting");
+        let id0 = create_test_task(&client, &admin, &task_type, 1, 1000);
+        let id1 = create_test_task(&client, &admin, &task_type, 1, 1000);
+        let id2 = create_test_task(&client, &admin, &task_type, 1, 1000);
+
+        let ids = client.get_tasks_by_creator(&admin);
+        assert_eq!(ids.len(), 3);
+        assert_eq!(ids.get(0).unwrap(), id0);
+        assert_eq!(ids.get(1).unwrap(), id1);
+        assert_eq!(ids.get(2).unwrap(), id2);
+
+        // A different creator should have an empty list
+        let other = Address::generate(&e);
+        let empty = client.get_tasks_by_creator(&other);
+        assert_eq!(empty.len(), 0);
     }
 }
