@@ -1,4 +1,11 @@
-use soroban_sdk::{symbol_short, Address, Env, String};
+use soroban_sdk::{contracttype, symbol_short, Address, Env, String};
+
+#[derive(Clone, Debug)]
+#[contracttype]
+pub struct Allowance {
+    pub amount: i128,
+    pub expiration_ledger: u32,
+}
 
 pub fn write_balance(e: &Env, addr: &Address, amount: i128) {
     let key = (symbol_short!("balance"), addr.clone());
@@ -59,4 +66,24 @@ pub fn read_supply(e: &Env) -> i128 {
         .instance()
         .get(&symbol_short!("supply"))
         .unwrap_or(0)
+}
+
+pub fn write_allowance(e: &Env, owner: &Address, spender: &Address, allowance: &Allowance) {
+    let key = (symbol_short!("allow"), owner.clone(), spender.clone());
+    e.storage().persistent().set(&key, allowance);
+}
+
+pub fn read_allowance(e: &Env, owner: &Address, spender: &Address) -> Option<Allowance> {
+    let key = (symbol_short!("allow"), owner.clone(), spender.clone());
+    e.storage().persistent().get(&key)
+}
+
+pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128) {
+    let key = (symbol_short!("allow"), owner.clone(), spender.clone());
+    let mut allowance: Allowance = e.storage().persistent().get(&key).unwrap();
+    allowance.amount = allowance
+        .amount
+        .checked_sub(amount)
+        .expect("allowance underflow");
+    e.storage().persistent().set(&key, &allowance);
 }

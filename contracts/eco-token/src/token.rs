@@ -29,6 +29,17 @@ pub struct BurnEvent {
     pub amount: i128,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ApproveEvent {
+    #[topic]
+    pub owner: Address,
+    #[topic]
+    pub spender: Address,
+    pub amount: i128,
+    pub expiration_ledger: u32,
+}
+
 #[contract]
 pub struct TokenContract;
 
@@ -161,6 +172,86 @@ impl TokenContract {
 
         BurnEvent {
             from: from.clone(),
+            amount,
+        }
+        .publish(&e);
+    }
+
+    pub fn approve(e: Env, owner: Address, spender: Address, amount: i128, expiration_ledger: u32) {
+        owner.require_auth();
+
+        let allowance = storage::Allowance {
+            amount,
+            expiration_ledger,
+        };
+        storage::write_allowance(&e, &owner, &spender, &allowance);
+
+        ApproveEvent {
+            owner,
+            spender,
+            amount,
+            expiration_ledger,
+        }
+        .publish(&e);
+    }
+
+    pub fn allowance(e: Env, owner: Address, spender: Address) -> i128 {
+        match storage::read_allowance(&e, &owner, &spender) {
+            Some(a) => {
+                if a.expiration_ledger < e.ledger().sequence() {
+                    0
+                } else {
+                    a.amount
+                }
+            }
+            None => 0,
+        }
+    }
+
+    pub fn transfer_from(e: Env, spender: Address, from: Address, to: Address, amount: i128) {
+        spender.require_auth();
+
+        if amount <= 0 {
+            panic!("amount must be positive");
+        }
+
+        let allowance = match storage::read_allowance(&e, &from, &spender) {
+            Some(a) => {
+                if a.expiration_ledger < e.ledger().sequence() {
+                    panic!("allowance expired");
+                }
+                a
+            }
+            None => panic!("allowance not found"),
+        };
+
+        if allowance.amount < amount {
+            panic!("insufficient allowance");
+        }
+
+        storage::spend_allowance(&e, &from, &spender, amount);
+
+        let from_balance = storage::read_balance(&e, &from);
+        if from_balance < amount {
+            panic!("insufficient balance");
+        }
+
+        storage::write_balance(
+            &e,
+            &from,
+            from_balance.checked_sub(amount).expect("balance underflow"),
+        );
+
+        let to_balance = storage::read_balance(&e, &to);
+        storage::write_balance(
+            &e,
+            &to,
+            to_balance.checked_add(amount).expect("balance overflow"),
+        );
+
+        TransferEvent {
+            from,
+            to,
             amount,
         }
         .publish(&e);
@@ -445,5 +536,101 @@ mod test {
 
         e.mock_all_auths();
         client.burn(&user, &0);
+    }
+
+    #[test]
+    fn test_approve_and_transfer_from() {
+        let e = Env::default();
+        let admin = Address::generate(&e);
+        let owner = Address::generate(&e);
+        let spender = Address::generate(&e);
+        let recipient = Address::generate(&e);
+        let contract_id = e.register(TokenContract, ());
+        let client = TokenContractClient::new(&e, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&e, "ECO"),
+            &String::from_str(&e, "ECO"),
+            &7,
+        );
+
+        e.mock_all_auths();
+        client.mint(&owner, &1000);
+        client.approve(&owner, &spender, &500, &(e.ledger().sequence() + 100));
+
+        assert_eq!(client.allowance(&owner, &spender), 500);
+
+        client.transfer_from(&spender, &owner, &recipient, &300);
+
+        assert_eq!(client.balance(&owner), 700);
+        assert_eq!(client.balance(&recipient), 300);
+        assert_eq!(client.allowance(&owner, &spender), 200);
+    }
+
+    #[test]
+    #[should_panic(expected = "insufficient allowance")]
+    fn test_transfer_from_exceeds_allowance() {
+        let e = Env::default();
+        let admin = Address::generate(&e);
+        let owner = Address::generate(&e);
+        let spender = Address::generate(&e);
+        let recipient = Address::generate(&e);
+        let contract_id = e.register(TokenContract, ());
+        let client = TokenContractClient::new(&e, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&e, "ECO"),
+            &String::from_str(&e, "ECO"),
+            &7,
+        );
+
+        e.mock_all_auths();
+        client.mint(&owner, &1000);
+        client.approve(&owner, &spender, &100, &(e.ledger().sequence() + 100));
+        client.transfer_from(&spender, &owner, &recipient, &200);
+    }
+
+    #[test]
+    #[should_panic(expected = "allowance not found")]
+    fn test_transfer_from_no_allowance() {
+        let e = Env::default();
+        let admin = Address::generate(&e);
+        let owner = Address::generate(&e);
+        let spender = Address::generate(&e);
+        let recipient = Address::generate(&e);
+        let contract_id = e.register(TokenContract, ());
+        let client = TokenContractClient::new(&e, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&e, "ECO"),
+            &String::from_str(&e, "ECO"),
+            &7,
+        );
+
+        e.mock_all_auths();
+        client.mint(&owner, &1000);
+        client.transfer_from(&spender, &owner, &recipient, &100);
+    }
+
+    #[test]
+    fn test_zero_allowance_returns_zero() {
+        let e = Env::default();
+        let admin = Address::generate(&e);
+        let owner = Address::generate(&e);
+        let spender = Address::generate(&e);
+        let contract_id = e.register(TokenContract, ());
+        let client = TokenContractClient::new(&e, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&e, "ECO"),
+            &String::from_str(&e, "ECO"),
+            &7,
+        );
+
+        assert_eq!(client.allowance(&owner, &spender), 0);
     }
 }
