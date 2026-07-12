@@ -43,6 +43,16 @@ pub struct DisputeRaisedEvent {
     pub task_id: u64,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DisputeResolvedEvent {
+    #[topic]
+    pub user: Address,
+    pub task_id: u64,
+    pub approved: bool,
+    pub reward_amount: i128,
+}
+
 #[contract]
 pub struct RewardEngine;
 
@@ -232,6 +242,82 @@ impl RewardEngine {
         DisputeRaisedEvent { user, task_id }.publish(&e);
     }
 
+    pub fn resolve_dispute(
+        e: Env,
+        caller: Address,
+        user: Address,
+        task_id: u64,
+        approve: bool,
+        reward_amount: i128,
+    ) {
+        caller.require_auth();
+        let admin = storage::read_admin(&e);
+        if caller != admin {
+            panic!("unauthorized");
+        }
+
+        let mut verification = match storage::read_verification(&e, task_id, &user) {
+            Some(v) => v,
+            None => panic!("verification not found"),
+        };
+
+        if verification.status != VerificationStatus::Disputed {
+            panic!("verification is not disputed");
+        }
+
+        if approve {
+            if reward_amount <= 0 {
+                panic!("reward amount must be positive");
+            }
+            if let Some(min) = storage::read_min_reward(&e) {
+                if reward_amount < min {
+                    panic!("reward below minimum");
+                }
+            }
+            if let Some(max) = storage::read_max_reward(&e) {
+                if reward_amount > max {
+                    panic!("reward exceeds maximum");
+                }
+            }
+
+            verification.status = VerificationStatus::Approved;
+            verification.reward_amount = reward_amount;
+            verification.resolved_at = Some(e.ledger().timestamp());
+            storage::write_verification(&e, task_id, &user, &verification);
+
+            let registry_id = storage::read_registry(&e);
+            e.invoke_contract::<Val>(
+                &registry_id,
+                &Symbol::new(&e, "complete_task"),
+                vec![
+                    &e,
+                    e.current_contract_address().into_val(&e),
+                    task_id.into_val(&e),
+                    user.clone().into_val(&e),
+                ],
+            );
+
+            let token_id = storage::read_token(&e);
+            e.invoke_contract::<Val>(
+                &token_id,
+                &Symbol::new(&e, "mint"),
+                vec![&e, user.clone().into_val(&e), reward_amount.into_val(&e)],
+            );
+        } else {
+            verification.status = VerificationStatus::Rejected;
+            verification.resolved_at = Some(e.ledger().timestamp());
+            storage::write_verification(&e, task_id, &user, &verification);
+        }
+
+        DisputeResolvedEvent {
+            user,
+            task_id,
+            approved: approve,
+            reward_amount,
+        }
+        .publish(&e);
+    }
+
     pub fn get_verification(e: Env, task_id: u64, user: Address) -> Verification {
         match storage::read_verification(&e, task_id, &user) {
             Some(v) => v,
@@ -384,6 +470,49 @@ mod test {
 
         let verification = client.get_verification(&task_id, &user);
         assert_eq!(verification.status, VerificationStatus::Disputed);
+    }
+
+    #[test]
+    fn test_resolve_dispute_approve() {
+        let (e, admin, oracle, user, task_id, client) = setup();
+        e.mock_all_auths_allowing_non_root_auth();
+
+        let proof_cid = String::from_str(&e, "QmResDispute");
+        client.submit_proof(&oracle, &user, &task_id, &proof_cid);
+        client.dispute_proof(&admin, &user, &task_id);
+
+        client.resolve_dispute(&admin, &user, &task_id, &true, &1000);
+
+        let verification = client.get_verification(&task_id, &user);
+        assert_eq!(verification.status, VerificationStatus::Approved);
+        assert_eq!(verification.reward_amount, 1000);
+    }
+
+    #[test]
+    fn test_resolve_dispute_reject() {
+        let (e, admin, oracle, user, task_id, client) = setup();
+        e.mock_all_auths_allowing_non_root_auth();
+
+        let proof_cid = String::from_str(&e, "QmResReject");
+        client.submit_proof(&oracle, &user, &task_id, &proof_cid);
+        client.dispute_proof(&admin, &user, &task_id);
+
+        client.resolve_dispute(&admin, &user, &task_id, &false, &0);
+
+        let verification = client.get_verification(&task_id, &user);
+        assert_eq!(verification.status, VerificationStatus::Rejected);
+    }
+
+    #[test]
+    #[should_panic(expected = "verification is not disputed")]
+    fn test_resolve_non_disputed_fails() {
+        let (e, admin, oracle, user, task_id, client) = setup();
+        e.mock_all_auths_allowing_non_root_auth();
+
+        let proof_cid = String::from_str(&e, "QmNotDisputed");
+        client.submit_proof(&oracle, &user, &task_id, &proof_cid);
+
+        client.resolve_dispute(&admin, &user, &task_id, &true, &1000);
     }
 
     #[test]
