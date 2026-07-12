@@ -60,10 +60,10 @@ pub struct RewardEngine;
 impl RewardEngine {
     pub fn initialize(e: Env, admin: Address, token: Address, registry: Address, oracle: Address) {
         if storage::has_admin(&e) {
-            panic!("already initialized");
+            panic!("engine: already initialized");
         }
         if admin == oracle {
-            panic!("oracle must be different from admin");
+            panic!("engine: oracle must be different from admin");
         }
         storage::write_admin(&e, &admin);
         storage::write_token(&e, &token);
@@ -75,7 +75,7 @@ impl RewardEngine {
         caller.require_auth();
         let admin = storage::read_admin(&e);
         if caller != admin {
-            panic!("unauthorized");
+            panic!("engine: unauthorized");
         }
         storage::write_oracle(&e, &new_oracle);
     }
@@ -84,13 +84,13 @@ impl RewardEngine {
         caller.require_auth();
         let admin = storage::read_admin(&e);
         if caller != admin {
-            panic!("unauthorized");
+            panic!("engine: unauthorized");
         }
         if min_reward <= 0 {
-            panic!("min reward must be positive");
+            panic!("engine: min reward must be positive");
         }
         if max_reward < min_reward {
-            panic!("max reward must be >= min reward");
+            panic!("engine: max reward must be >= min reward");
         }
         storage::write_reward_range(&e, min_reward, max_reward);
     }
@@ -99,11 +99,11 @@ impl RewardEngine {
         oracle.require_auth();
         let stored_oracle = storage::read_oracle(&e);
         if oracle != stored_oracle {
-            panic!("unauthorized");
+            panic!("engine: unauthorized");
         }
 
         if storage::read_verification(&e, task_id, &user).is_some() {
-            panic!("proof already submitted");
+            panic!("engine: proof already submitted");
         }
 
         let verification = Verification {
@@ -138,29 +138,29 @@ impl RewardEngine {
         oracle.require_auth();
         let stored_oracle = storage::read_oracle(&e);
         if oracle != stored_oracle {
-            panic!("unauthorized");
+            panic!("engine: unauthorized");
         }
 
         let mut verification = match storage::read_verification(&e, task_id, &user) {
             Some(v) => v,
-            None => panic!("verification not found"),
+            None => panic!("engine: verification not found"),
         };
 
         if verification.status != VerificationStatus::Pending {
-            panic!("verification is not pending");
+            panic!("engine: verification is not pending");
         }
 
         if reward_amount <= 0 {
-            panic!("reward amount must be positive");
+            panic!("engine: reward amount must be positive");
         }
         if let Some(min) = storage::read_min_reward(&e) {
             if reward_amount < min {
-                panic!("reward below minimum");
+                panic!("engine: reward below minimum");
             }
         }
         if let Some(max) = storage::read_max_reward(&e) {
             if reward_amount > max {
-                panic!("reward exceeds maximum");
+                panic!("engine: reward exceeds maximum");
             }
         }
 
@@ -201,16 +201,16 @@ impl RewardEngine {
         oracle.require_auth();
         let stored_oracle = storage::read_oracle(&e);
         if oracle != stored_oracle {
-            panic!("unauthorized");
+            panic!("engine: unauthorized");
         }
 
         let mut verification = match storage::read_verification(&e, task_id, &user) {
             Some(v) => v,
-            None => panic!("verification not found"),
+            None => panic!("engine: verification not found"),
         };
 
         if verification.status != VerificationStatus::Pending {
-            panic!("verification is not pending");
+            panic!("engine: verification is not pending");
         }
 
         verification.status = VerificationStatus::Rejected;
@@ -229,12 +229,12 @@ impl RewardEngine {
         caller.require_auth();
         let admin = storage::read_admin(&e);
         if caller != admin {
-            panic!("unauthorized");
+            panic!("engine: unauthorized");
         }
 
         let mut verification = match storage::read_verification(&e, task_id, &user) {
             Some(v) => v,
-            None => panic!("verification not found"),
+            None => panic!("engine: verification not found"),
         };
 
         verification.status = VerificationStatus::Disputed;
@@ -254,30 +254,30 @@ impl RewardEngine {
         caller.require_auth();
         let admin = storage::read_admin(&e);
         if caller != admin {
-            panic!("unauthorized");
+            panic!("engine: unauthorized");
         }
 
         let mut verification = match storage::read_verification(&e, task_id, &user) {
             Some(v) => v,
-            None => panic!("verification not found"),
+            None => panic!("engine: verification not found"),
         };
 
         if verification.status != VerificationStatus::Disputed {
-            panic!("verification is not disputed");
+            panic!("engine: verification is not disputed");
         }
 
         if approve {
             if reward_amount <= 0 {
-                panic!("reward amount must be positive");
+                panic!("engine: reward amount must be positive");
             }
             if let Some(min) = storage::read_min_reward(&e) {
                 if reward_amount < min {
-                    panic!("reward below minimum");
+                    panic!("engine: reward below minimum");
                 }
             }
             if let Some(max) = storage::read_max_reward(&e) {
                 if reward_amount > max {
-                    panic!("reward exceeds maximum");
+                    panic!("engine: reward exceeds maximum");
                 }
             }
 
@@ -322,7 +322,7 @@ impl RewardEngine {
     pub fn get_verification(e: Env, task_id: u64, user: Address) -> Verification {
         match storage::read_verification(&e, task_id, &user) {
             Some(v) => v,
-            None => panic!("verification not found"),
+            None => panic!("engine: verification not found"),
         }
     }
 
@@ -436,7 +436,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "oracle must be different from admin")]
+    #[should_panic(expected = "engine: oracle must be different from admin")]
     fn test_initialize_oracle_same_as_admin() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -450,7 +450,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "unauthorized")]
+    #[should_panic(expected = "engine: unauthorized")]
     fn test_unauthorized_oracle_cannot_submit() {
         let (e, _admin, _oracle, user, _task_id, client) = setup();
         e.mock_all_auths_allowing_non_root_auth();
@@ -461,7 +461,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "verification is not pending")]
+    #[should_panic(expected = "engine: verification is not pending")]
     fn test_double_approve_fails() {
         let (e, _admin, oracle, user, task_id, client) = setup();
         e.mock_all_auths_allowing_non_root_auth();
@@ -518,7 +518,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "verification is not disputed")]
+    #[should_panic(expected = "engine: verification is not disputed")]
     fn test_resolve_non_disputed_fails() {
         let (e, admin, oracle, user, task_id, client) = setup();
         e.mock_all_auths_allowing_non_root_auth();
@@ -586,7 +586,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "reward below minimum")]
+    #[should_panic(expected = "engine: reward below minimum")]
     fn test_reward_below_minimum() {
         let (e, admin, oracle, user, task_id, client) = setup();
         e.mock_all_auths_allowing_non_root_auth();
@@ -599,7 +599,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "reward exceeds maximum")]
+    #[should_panic(expected = "engine: reward exceeds maximum")]
     fn test_reward_above_maximum() {
         let (e, admin, oracle, user, task_id, client) = setup();
         e.mock_all_auths_allowing_non_root_auth();
@@ -612,7 +612,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "max reward must be >= min reward")]
+    #[should_panic(expected = "engine: max reward must be >= min reward")]
     fn test_set_invalid_reward_range() {
         let (e, admin, _oracle, _user, _task_id, client) = setup();
         e.mock_all_auths_allowing_non_root_auth();

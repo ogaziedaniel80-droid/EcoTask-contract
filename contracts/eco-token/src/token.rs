@@ -47,7 +47,7 @@ pub struct TokenContract;
 impl TokenContract {
     pub fn initialize(e: Env, admin: Address, name: String, symbol: String, decimal: u32) {
         if storage::has_admin(&e) {
-            panic!("already initialized");
+            panic!("token: already initialized");
         }
         storage::write_admin(&e, &admin);
         storage::write_metadata(&e, &name, &symbol, &decimal);
@@ -59,7 +59,7 @@ impl TokenContract {
         admin.require_auth();
 
         if amount <= 0 {
-            panic!("amount must be positive");
+            panic!("token: amount must be positive");
         }
 
         let balance = storage::read_balance(&e, &to);
@@ -84,12 +84,12 @@ impl TokenContract {
         from.require_auth();
 
         if amount <= 0 {
-            panic!("amount must be positive");
+            panic!("token: amount must be positive");
         }
 
         let from_balance = storage::read_balance(&e, &from);
         if from_balance < amount {
-            panic!("insufficient balance");
+            panic!("token: insufficient balance");
         }
 
         storage::write_balance(
@@ -141,10 +141,10 @@ impl TokenContract {
         current_admin.require_auth();
         let stored_admin = storage::read_admin(&e);
         if current_admin != stored_admin {
-            panic!("unauthorized");
+            panic!("token: unauthorized");
         }
         if new_admin == current_admin {
-            panic!("new admin must be different");
+            panic!("token: new admin must be different");
         }
         storage::write_admin(&e, &new_admin);
     }
@@ -153,12 +153,12 @@ impl TokenContract {
         from.require_auth();
 
         if amount <= 0 {
-            panic!("amount must be positive");
+            panic!("token: amount must be positive");
         }
 
         let balance = storage::read_balance(&e, &from);
         if balance < amount {
-            panic!("insufficient balance");
+            panic!("token: insufficient balance");
         }
 
         storage::write_balance(
@@ -212,28 +212,28 @@ impl TokenContract {
         spender.require_auth();
 
         if amount <= 0 {
-            panic!("amount must be positive");
+            panic!("token: amount must be positive");
         }
 
         let allowance = match storage::read_allowance(&e, &from, &spender) {
             Some(a) => {
                 if a.expiration_ledger < e.ledger().sequence() {
-                    panic!("allowance expired");
+                    panic!("token: allowance expired");
                 }
                 a
             }
-            None => panic!("allowance not found"),
+            None => panic!("token: allowance not found"),
         };
 
         if allowance.amount < amount {
-            panic!("insufficient allowance");
+            panic!("token: insufficient allowance");
         }
 
         storage::spend_allowance(&e, &from, &spender, amount);
 
         let from_balance = storage::read_balance(&e, &from);
         if from_balance < amount {
-            panic!("insufficient balance");
+            panic!("token: insufficient balance");
         }
 
         storage::write_balance(
@@ -331,7 +331,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "amount must be positive")]
+    #[should_panic(expected = "token: amount must be positive")]
     fn test_mint_zero_amount() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -351,7 +351,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "insufficient balance")]
+    #[should_panic(expected = "token: insufficient balance")]
     fn test_transfer_insufficient_balance() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -391,7 +391,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "already initialized")]
+    #[should_panic(expected = "token: already initialized")]
     fn test_double_initialize_fails() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -435,7 +435,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "unauthorized")]
+    #[should_panic(expected = "token: unauthorized")]
     fn test_transfer_admin_unauthorized() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -456,7 +456,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "new admin must be different")]
+    #[should_panic(expected = "token: new admin must be different")]
     fn test_transfer_admin_same_address() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -498,7 +498,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "insufficient balance")]
+    #[should_panic(expected = "token: insufficient balance")]
     fn test_burn_more_than_balance() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -519,7 +519,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "amount must be positive")]
+    #[should_panic(expected = "token: amount must be positive")]
     fn test_burn_zero_amount() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -569,7 +569,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "insufficient allowance")]
+    #[should_panic(expected = "token: insufficient allowance")]
     fn test_transfer_from_exceeds_allowance() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -593,7 +593,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "allowance not found")]
+    #[should_panic(expected = "token: allowance not found")]
     fn test_transfer_from_no_allowance() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -635,7 +635,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "amount must be positive")]
+    #[should_panic(expected = "token: amount must be positive")]
     fn test_mint_negative_amount() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -655,7 +655,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "amount must be positive")]
+    #[should_panic(expected = "token: amount must be positive")]
     fn test_transfer_negative_amount() {
         let e = Env::default();
         let admin = Address::generate(&e);
@@ -677,7 +677,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "amount must be positive")]
+    #[should_panic(expected = "token: amount must be positive")]
     fn test_burn_negative_amount() {
         let e = Env::default();
         let admin = Address::generate(&e);

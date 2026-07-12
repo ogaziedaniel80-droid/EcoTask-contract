@@ -53,7 +53,7 @@ pub struct RegistryContract;
 impl RegistryContract {
     pub fn initialize(e: Env, admin: Address) {
         if storage::has_admin(&e) {
-            panic!("already initialized");
+            panic!("registry: already initialized");
         }
         storage::write_admin(&e, &admin);
     }
@@ -85,13 +85,13 @@ impl RegistryContract {
         access::require_sponsor(&e, &creator);
 
         if reward_amount <= 0 {
-            panic!("reward must be positive");
+            panic!("registry: reward must be positive");
         }
         if max_completions == 0 {
-            panic!("max completions must be positive");
+            panic!("registry: max completions must be positive");
         }
         if expires_at <= e.ledger().timestamp() {
-            panic!("expiry must be in the future");
+            panic!("registry: expiry must be in the future");
         }
 
         let task_id = storage::next_task_id(&e);
@@ -121,7 +121,7 @@ impl RegistryContract {
     pub fn get_task(e: Env, task_id: u64) -> Task {
         match storage::read_task(&e, task_id) {
             Some(task) => task,
-            None => panic!("task not found"),
+            None => panic!("registry: task not found"),
         }
     }
 
@@ -131,20 +131,20 @@ impl RegistryContract {
 
         let mut task = match storage::read_task(&e, task_id) {
             Some(task) => task,
-            None => panic!("task not found"),
+            None => panic!("registry: task not found"),
         };
 
         if task.status != TaskStatus::Active {
-            panic!("task is not active");
+            panic!("registry: task is not active");
         }
         if task.expires_at < e.ledger().timestamp() {
-            panic!("task expired");
+            panic!("registry: task expired");
         }
         if storage::is_completed(&e, task_id, &user) {
-            panic!("already completed");
+            panic!("registry: already completed");
         }
         if task.completions >= task.max_completions {
-            panic!("max completions reached");
+            panic!("registry: max completions reached");
         }
 
         task.completions += 1;
@@ -164,11 +164,11 @@ impl RegistryContract {
 
         let mut task = match storage::read_task(&e, task_id) {
             Some(task) => task,
-            None => panic!("task not found"),
+            None => panic!("registry: task not found"),
         };
 
         if task.status != TaskStatus::Active {
-            panic!("task is not active");
+            panic!("registry: task is not active");
         }
 
         task.status = TaskStatus::Expired;
@@ -180,14 +180,14 @@ impl RegistryContract {
 
         let mut task = match storage::read_task(&e, task_id) {
             Some(task) => task,
-            None => panic!("task not found"),
+            None => panic!("registry: task not found"),
         };
 
         if task.creator != caller {
-            panic!("unauthorized");
+            panic!("registry: unauthorized");
         }
         if task.status != TaskStatus::Active {
-            panic!("task is not active");
+            panic!("registry: task is not active");
         }
 
         task.status = TaskStatus::Expired;
@@ -288,7 +288,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "already completed")]
+    #[should_panic(expected = "registry: already completed")]
     fn test_double_claim_prevention() {
         let (e, admin, client) = setup();
         e.mock_all_auths();
@@ -352,7 +352,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "unauthorized")]
+    #[should_panic(expected = "registry: unauthorized")]
     fn test_unauthorized_creator() {
         let (e, _admin, client) = setup();
         e.mock_all_auths();
@@ -371,7 +371,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "unauthorized")]
+    #[should_panic(expected = "registry: unauthorized")]
     fn test_unauthorized_expire() {
         let (e, _admin, client) = setup();
         e.mock_all_auths();
@@ -424,7 +424,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "unauthorized")]
+    #[should_panic(expected = "registry: unauthorized")]
     fn test_removed_sponsor_cannot_create_task() {
         let (e, admin, client) = setup();
         e.mock_all_auths();
@@ -445,7 +445,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "unauthorized")]
+    #[should_panic(expected = "registry: unauthorized")]
     fn test_remove_sponsor_non_admin() {
         let (e, admin, client) = setup();
         e.mock_all_auths();
@@ -458,7 +458,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "task is not active")]
+    #[should_panic(expected = "registry: task is not active")]
     fn test_expire_already_expired_task() {
         let (e, admin, client) = setup();
         e.mock_all_auths();
@@ -476,7 +476,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "task expired")]
+    #[should_panic(expected = "registry: task expired")]
     fn test_expired_task_cannot_be_completed() {
         let (e, admin, client) = setup();
         e.mock_all_auths();
@@ -516,7 +516,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "unauthorized")]
+    #[should_panic(expected = "registry: unauthorized")]
     fn test_cancel_task_not_creator() {
         let (e, admin, client) = setup();
         e.mock_all_auths();
@@ -534,7 +534,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "task is not active")]
+    #[should_panic(expected = "registry: task is not active")]
     fn test_cancel_already_completed_task() {
         let (e, admin, client) = setup();
         e.mock_all_auths();
